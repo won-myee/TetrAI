@@ -26,3 +26,6 @@ AI(챗gpt)로 만든 테트리스 게임
 - Two lines cleared: 300
 - Three lines cleared: 700
 - Four or more lines cleared: 1000
+
+NO Copyright Background music by abaines
+[Original YouTube video](https://www.youtube.com/watch?v=ZOZBnthb_xc)
