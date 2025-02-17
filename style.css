@@ -1,0 +1,22 @@
+body {
+  background-color: #eee;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+#disclaimer {
+  background-color: #000;
+  color: #fff;
+  padding: 10px;
+  font-size: 14px;
+}
+
+canvas {
+  background-color: #fff;
+  border: 1px solid #000;
+  margin-top: 10px;
+  touch-action: none; /* 모바일 터치 기본 동작(스크롤 등) 방지 */
+}
+
