@@ -65,7 +65,10 @@ let lastTime = 0;
 // 터치 이벤트용 좌표 변수 (모바일용)
 let touchStartX = 0;
 let touchStartY = 0;
-const touchThreshold = 30; // 스와이프 임계값 (픽셀)
+let originalTouchStartX = 0;
+let originalTouchStartY = 0;
+let hardDropTriggered = false; // 한 터치 제스처 내에서 hard drop이 실행되었는지 체크
+const touchThreshold = 30; // 기본 스와이프 임계값 (좌우 이동 기준)
 
 // 현재 블록이 (posX, posY) 위치에서 올바른지 확인 (경계 및 겹침 체크)
 function isValidPosition(shape, posX, posY) {
@@ -118,7 +121,7 @@ function move(direction) {
   }
 }
 
-// 강제 하강 (Down 키 또는 수직 스와이프)
+// 강제 하강 (일반 하강)
 function drop() {
   shapeY++;
   if (!isValidPosition(currentShape, shapeX, shapeY)) {
@@ -129,6 +132,19 @@ function drop() {
     if (!isValidPosition(currentShape, shapeX, shapeY)) {
       gameOver = true;
     }
+  }
+}
+
+// hard drop: 현재 블록을 가능한 가장 아래로 즉시 이동 후 병합
+function hardDrop() {
+  while (isValidPosition(currentShape, shapeX, shapeY + 1)) {
+    shapeY++;
+  }
+  merge();
+  clearLines();
+  spawnShape();
+  if (!isValidPosition(currentShape, shapeX, shapeY)) {
+    gameOver = true;
   }
 }
 
@@ -244,6 +260,29 @@ function drawGame() {
     }
   }
 
+  // ghost 블록 (현재 블록이 수직으로 낙하할 최종 위치 미리보기)
+  if (currentShape) {
+    let ghostY = shapeY;
+    while (isValidPosition(currentShape, shapeX, ghostY + 1)) {
+      ghostY++;
+    }
+    ctx.save();
+    ctx.globalAlpha = 0.3; // 반투명 설정
+    ctx.fillStyle = SHAPE_COLORS[currentShapeIndex];
+    for (let y = 0; y < currentShape.length; y++) {
+      for (let x = 0; x < currentShape[y].length; x++) {
+        if (currentShape[y][x] !== 0) {
+          const drawX = (shapeX + x) * TILE_SIZE;
+          const drawY = TOP_MARGIN + (ghostY + y) * TILE_SIZE;
+          ctx.fillRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = "black";
+          ctx.strokeRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   // 현재 이동 중인 블록 그리기
   if (currentShape) {
     ctx.fillStyle = SHAPE_COLORS[currentShapeIndex];
@@ -294,6 +333,9 @@ document.addEventListener("keydown", (event) => {
     case "ArrowUp":
       rotate();
       break;
+    case "Space":  // 스페이스바를 누르면 hard drop 실행
+      hardDrop();
+      break;
   }
 });
 
@@ -301,13 +343,13 @@ document.addEventListener("keydown", (event) => {
 canvas.addEventListener("click", () => {
   if (!gameStarted) {
     gameStarted = true;
-    // 사용자의 클릭 후 배경음악 재생 (autoplay 제한 회피)
     bgMusic.play().catch(e => console.log("오디오 재생 오류:", e));
     spawnShape();
   }
 });
 
-// 터치 이벤트 (모바일)
+// 모바일 터치 이벤트
+
 // 터치 시작: 시작 화면에서 게임 시작, 아니면 터치 좌표 기록
 canvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
@@ -318,38 +360,52 @@ canvas.addEventListener("touchstart", (e) => {
     return;
   }
   let touch = e.changedTouches[0];
+  originalTouchStartX = touch.pageX;
+  originalTouchStartY = touch.pageY;
+  // 연속 이동을 위한 기준 좌표 초기화
   touchStartX = touch.pageX;
   touchStartY = touch.pageY;
+  hardDropTriggered = false;
 });
 
-// 터치 종료: 스와이프 방향에 따라 좌우 이동, 하강 또는 회전 처리
-canvas.addEventListener("touchend", (e) => {
+// 터치 이동: 좌우 스와이프 시 블록을 손가락을 따라 연속적으로 이동하고,
+// 강한 아래쪽 스와이프 시 hard drop 실행
+canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
   if (!gameStarted || gameOver) return;
   let touch = e.changedTouches[0];
   let dx = touch.pageX - touchStartX;
   let dy = touch.pageY - touchStartY;
-  
-  // 탭인 경우 (움직임이 작으면)
-  if (Math.abs(dx) < touchThreshold && Math.abs(dy) < touchThreshold) {
-    rotate();
-    return;
-  }
-  
-  // 수평 스와이프가 수직보다 클 때
-  if (Math.abs(dx) > Math.abs(dy)) {
+
+  // 좌우 연속 이동: 터치가 일정 픽셀 이상 이동할 때마다 한 칸씩 이동
+  while (Math.abs(dx) >= touchThreshold) {
     if (dx > 0) {
       move(1);
+      touchStartX += touchThreshold;
     } else {
       move(-1);
+      touchStartX -= touchThreshold;
     }
-  } else {
-    // 수직 스와이프: 아래쪽이면 하강, 위쪽이면 회전
-    if (dy > 0) {
-      drop();
-    } else {
-      rotate();
-    }
+    dx = touch.pageX - touchStartX;
+  }
+
+  // 세로 이동: 아래로 강하게 스와이프하면 hard drop (예: 50픽셀 이상)
+  const hardDropThreshold = 50; // 필요에 따라 조절
+  if (dy > hardDropThreshold && !hardDropTriggered) {
+    hardDrop();
+    hardDropTriggered = true;
+  }
+});
+
+// 터치 종료: 전체 이동 거리가 작으면 탭으로 간주해 회전 처리
+canvas.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  if (!gameStarted || gameOver) return;
+  let touch = e.changedTouches[0];
+  let totalDx = touch.pageX - originalTouchStartX;
+  let totalDy = touch.pageY - originalTouchStartY;
+  if (Math.abs(totalDx) < touchThreshold && Math.abs(totalDy) < touchThreshold && !hardDropTriggered) {
+    rotate();
   }
 });
 
