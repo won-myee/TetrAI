@@ -390,7 +390,7 @@ canvas.addEventListener("touchmove", (e) => {
   }
 
   // 세로 이동: 아래로 강하게 스와이프하면 hard drop (예: 50픽셀 이상)
-  const hardDropThreshold = 50; // 필요에 따라 조절
+  const hardDropThreshold = 150; // 필요에 따라 조절
   if (dy > hardDropThreshold && !hardDropTriggered) {
     hardDrop();
     hardDropTriggered = true;
