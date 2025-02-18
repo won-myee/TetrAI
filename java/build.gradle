@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'kr.kro.wonmyee.tetris'
+version = '1.1'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    //JavaFX 기본탑재
+}
+
+application {
+    mainClassName = 'kr.kro.wonmyee.tetris.TetrisGame'
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'kr.kro.wonmyee.tetris.TetrisGame'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
